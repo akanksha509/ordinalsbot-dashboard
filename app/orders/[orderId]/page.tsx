@@ -1,185 +1,234 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import { Header } from '@/components/Layout/Header'
 import { NetworkBar } from '@/components/Layout/NetworkBar'
 import { Footer } from '@/components/Layout/Footer'
-import { Wizard } from '@/components/inscribe/Wizard'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Viewer } from '@/components/orders/Viewer'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { 
-  Upload, 
-  FileText, 
-  ArrowRight, 
-  Info,
-  CheckCircle,
-  Clock,
-  Shield,
-  Coins
-} from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import { Order } from '@/types'
 
-const PROCESS_STEPS = [
-  {
-    title: 'Choose Type',
-    description: 'Select inscription type and upload content',
-    icon: Upload
-  },
-  {
-    title: 'Add Details',
-    description: 'Configure metadata and options',
-    icon: FileText
-  },
-  {
-    title: 'Review & Pay',
-    description: 'Confirm order and make payment',
-    icon: CheckCircle
-  },
-  {
-    title: 'Track Progress',
-    description: 'Monitor inscription status in real-time',
-    icon: Clock
+export default function OrderDetailPage() {
+  const params = useParams()
+  const orderId = params.orderId as string
+  const [mounted, setMounted] = useState(false)
+
+  // Ensure client-side rendering for localStorage access
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Add this order to tracked orders if not already there
+  useEffect(() => {
+    if (!mounted || !orderId) return
+
+    try {
+      const stored = localStorage.getItem('ordinalsbot_tracked_orders')
+      const trackedOrders = stored ? JSON.parse(stored) : []
+      
+      if (!trackedOrders.includes(orderId)) {
+        const newTrackedOrders = [orderId, ...trackedOrders.slice(0, 19)] // Keep max 20
+        localStorage.setItem('ordinalsbot_tracked_orders', JSON.stringify(newTrackedOrders))
+      }
+    } catch (error) {
+      console.error('Error updating tracked orders:', error)
+    }
+  }, [orderId, mounted])
+
+  // Validate order ID format
+  const isValidOrderId = (id: string): boolean => {
+    // UUID format validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    return uuidRegex.test(id)
   }
-]
 
-export default function InscribePage() {
-  const [showWizard, setShowWizard] = useState(false)
+  // Fetch order data from OrdinalsBot API
+  const { data: order, isLoading, error, refetch } = useQuery({
+    queryKey: ['order', orderId],
+    queryFn: async () => {
+      if (!orderId || !isValidOrderId(orderId)) {
+        throw new Error('Invalid order ID format')
+      }
 
-  if (showWizard) {
+      const response = await fetch(`/api/order?id=${encodeURIComponent(orderId)}`)
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Order not found')
+        }
+        throw new Error(`Failed to fetch order: ${response.status}`)
+      }
+
+      const result = await response.json()
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch order details')
+      }
+
+      return result.data as Order
+    },
+    enabled: mounted && !!orderId,
+    staleTime: 30000, // 30 seconds
+    retry: (failureCount, error) => {
+      // Don't retry for 404 errors
+      if (error.message.includes('not found')) {
+        return false
+      }
+      return failureCount < 3
+    },
+  })
+
+  const handleBack = () => {
+    // Try to go back, fallback to orders page
+    if (window.history.length > 1) {
+      window.history.back()
+    } else {
+      window.location.href = '/orders'
+    }
+  }
+
+  // Show loading skeleton during SSR and initial load
+  if (!mounted || isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
         <NetworkBar />
+        
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Wizard 
-            onExit={() => setShowWizard(false)}
-          />
+          <div className="space-y-6">
+            {/* Header Skeleton */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Skeleton className="h-10 w-20" />
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-64" />
+                  <Skeleton className="h-4 w-48" />
+                </div>
+              </div>
+              <Skeleton className="h-10 w-32" />
+            </div>
+
+            {/* Content Skeletons */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <Skeleton className="h-64" />
+                <Skeleton className="h-96" />
+              </div>
+              <div className="space-y-6">
+                <Skeleton className="h-48" />
+                <Skeleton className="h-64" />
+                <Skeleton className="h-32" />
+              </div>
+            </div>
+          </div>
         </main>
+
         <Footer />
       </div>
     )
   }
 
+  // Validate order ID format
+  if (!isValidOrderId(orderId)) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <NetworkBar />
+        
+        <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-6">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" onClick={handleBack}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            </div>
+
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Invalid order ID format. Please check the URL and try again.
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex space-x-4">
+              <Button onClick={handleBack}>
+                Go Back
+              </Button>
+              <Button variant="outline" asChild>
+                <a href="/orders">
+                  View All Orders
+                </a>
+              </Button>
+            </div>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <NetworkBar />
+        
+        <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-6">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" onClick={handleBack}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            </div>
+
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                {error instanceof Error ? error.message : 'Failed to load order details from OrdinalsBot API.'}
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex space-x-4">
+              <Button onClick={() => refetch()}>
+                Try Again
+              </Button>
+              <Button variant="outline" onClick={handleBack}>
+                Go Back
+              </Button>
+              <Button variant="outline" asChild>
+                <a href="/orders">
+                  View All Orders
+                </a>
+              </Button>
+            </div>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+    )
+  }
+
+  // Success state - render order details
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <NetworkBar />
       
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Create Bitcoin Inscriptions</h1>
-          <p className="text-xl text-muted-foreground mb-6 max-w-2xl mx-auto">
-            Permanently inscribe images, text, files, and BRC-20 tokens directly onto the Bitcoin blockchain
-          </p>
-          <Button 
-            size="lg" 
-            onClick={() => setShowWizard(true)}
-            className="text-lg px-8 py-3"
-          >
-            Start Creating
-            <ArrowRight className="h-5 w-5 ml-2" />
-          </Button>
-        </div>
-
-        {/* Features */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <Card className="text-center">
-            <CardContent className="p-6">
-              <Shield className="h-12 w-12 mx-auto mb-4 text-green-600" />
-              <h3 className="font-semibold mb-2">Permanent Storage</h3>
-              <p className="text-sm text-muted-foreground">
-                Data stored forever on Bitcoin blockchain
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card className="text-center">
-            <CardContent className="p-6">
-              <CheckCircle className="h-12 w-12 mx-auto mb-4 text-blue-600" />
-              <h3 className="font-semibold mb-2">Immutable</h3>
-              <p className="text-sm text-muted-foreground">
-                Cannot be changed or deleted once inscribed
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card className="text-center">
-            <CardContent className="p-6">
-              <Coins className="h-12 w-12 mx-auto mb-4 text-orange-600" />
-              <h3 className="font-semibold mb-2">True Ownership</h3>
-              <p className="text-sm text-muted-foreground">
-                Own your digital assets with Bitcoin's security
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Process Overview */}
-        <Card className="mb-12">
-          <CardHeader>
-            <CardTitle className="text-center">How It Works</CardTitle>
-            <CardDescription className="text-center">
-              Simple 4-step process to create your inscription
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {PROCESS_STEPS.map((step, index) => {
-                const Icon = step.icon
-                return (
-                  <div key={index} className="text-center">
-                    <div className="relative">
-                      <div className="w-12 h-12 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Icon className="h-6 w-6" />
-                      </div>
-                      {index < PROCESS_STEPS.length - 1 && (
-                        <div className="hidden md:block absolute top-6 left-[calc(50%+24px)] w-[calc(100vw/4-48px)] h-0.5 bg-muted-foreground/20" />
-                      )}
-                    </div>
-                    <h4 className="font-medium mb-1">{step.title}</h4>
-                    <p className="text-sm text-muted-foreground">{step.description}</p>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Info className="h-5 w-5 mr-2" />
-                Pricing
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                <li>• <strong>Network Fee:</strong> Bitcoin transaction fee (varies by network congestion)</li>
-                <li>• <strong>Service Fee:</strong> Platform fee for inscription processing</li>
-                <li>• <strong>Final Cost:</strong> Calculated during checkout based on file size and fee rate</li>
-              </ul>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Clock className="h-5 w-5 mr-2" />
-                Timeline
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                <li>• <strong>Payment:</strong> Instant wallet confirmation</li>
-                <li>• <strong>Processing:</strong> 10-60 minutes depending on network</li>
-                <li>• <strong>Confirmation:</strong> 1 Bitcoin block confirmation</li>
-                <li>• <strong>Completion:</strong> Inscription appears in your wallet</li>
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
+        <Viewer 
+          orderId={orderId} 
+          initialOrder={order} 
+        />
       </main>
 
       <Footer />

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Wallet, ChevronDown, Copy, LogOut, User, CheckCircle, AlertTriangle } from 'lucide-react'
 import { useLaserEyes } from '@omnisat/lasereyes-react'
 import { Button } from '@/components/ui/button'
@@ -24,10 +24,20 @@ import {
 
 export function ConnectButton() {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [forceRender, setForceRender] = useState(0)
   const { toast } = useToast()
   
   // Use LaserEyes hook directly - it handles SSR internally
   const laserEyes = useLaserEyes()
+
+  // Force re-render when LaserEyes state changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setForceRender(prev => prev + 1)
+    }, 100)
+    
+    return () => clearTimeout(timer)
+  }, [laserEyes.connected, laserEyes.address, laserEyes.network])
 
   // Check PSBT compatibility
   const psbtCompatibility = checkPSBTCompatibility(laserEyes)
@@ -41,6 +51,8 @@ export function ConnectButton() {
   const handleDisconnect = async () => {
     try {
       await laserEyes.disconnect()
+      // Force re-render after disconnect
+      setTimeout(() => setForceRender(prev => prev + 1), 100)
       toast({
         title: "Wallet disconnected",
         description: "Your wallet has been disconnected",
@@ -63,6 +75,8 @@ export function ConnectButton() {
 
   const handleModalClose = () => {
     setIsModalOpen(false)
+    // Force re-render after modal closes to catch any connection changes
+    setTimeout(() => setForceRender(prev => prev + 1), 200)
   }
 
   // Show loading state while connecting

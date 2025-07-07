@@ -29,22 +29,44 @@ export function OrderRow({ order, onClick, showDetails = false }: OrderRowProps)
     )
   }
 
-  const handleCopyOrderId = () => {
+  const handleCopyOrderId = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent row click
     copyToClipboard(order.id, 'Order ID')
   }
 
-  const handleCopyTxid = () => {
+  const handleCopyTxid = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent row click
     if (!order.txid) return
     copyToClipboard(order.txid, 'Transaction ID')
   }
 
-  const handleViewExplorer = () => {
+  const handleViewExplorer = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent row click
     if (!order.txid) return
     const network = getNetworkFromEnv()
     const explorerUrl = network === 'testnet' 
       ? `https://mempool.space/testnet/tx/${order.txid}`
       : `https://mempool.space/tx/${order.txid}`
     window.open(explorerUrl, '_blank')
+  }
+
+  const handleViewDetails = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent row click
+    if (onClick) {
+      onClick()
+    }
+  }
+
+  const handleRowClick = (e: React.MouseEvent) => {
+    // Don't trigger if clicking on interactive elements
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('[role="button"]')) {
+      return
+    }
+    
+    if (onClick) {
+      onClick()
+    }
   }
 
   // Order type detection with fallbacks
@@ -61,7 +83,7 @@ export function OrderRow({ order, onClick, showDetails = false }: OrderRowProps)
     }
   }
 
-  //  Better description with more fallbacks
+  // Better description with more fallbacks
   const getOrderDescription = () => {
     // Try BRC-20 details first
     if (order.brc20Details?.ticker) {
@@ -104,7 +126,7 @@ export function OrderRow({ order, onClick, showDetails = false }: OrderRowProps)
         onClick && "cursor-pointer",
         isExpanded && "shadow-md"
       )}
-      onClick={onClick}
+      onClick={handleRowClick}
     >
       {/* Main Row */}
       <div className="flex items-center justify-between p-4">
@@ -202,7 +224,7 @@ export function OrderRow({ order, onClick, showDetails = false }: OrderRowProps)
               {onClick && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onClick()}>
+                  <DropdownMenuItem onClick={handleViewDetails}>
                     <Eye className="mr-2 h-4 w-4" />
                     View Details
                   </DropdownMenuItem>
