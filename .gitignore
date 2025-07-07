@@ -1,0 +1,227 @@
+# ====== NEXT.JS ======
+.next/
+out/
+build/
+dist/
+
+# ====== NODE.JS ======
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ====== ENVIRONMENT VARIABLES ======
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+
+.env.example
+config/keys.js
+config/production.json
+config/development.json
+
+# ====== VERCEL ======
+.vercel
+.vercel.json
+
+# ====== PACKAGE MANAGERS ======
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnpm-debug.log
+
+# ====== TYPESCRIPT ======
+*.tsbuildinfo
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# ====== LOGS ======
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ====== RUNTIME DATA ======
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ====== COVERAGE DIRECTORY ======
+lib-cov/
+coverage/
+nyc_output/
+.nyc_output/
+
+# ====== DEPENDENCY DIRECTORIES ======
+node_modules/
+jspm_packages/
+
+# ====== OPTIONAL NPM CACHE ======
+.npm
+.eslintcache
+
+# ====== OPTIONAL REPL HISTORY ======
+.node_repl_history
+
+# ====== OUTPUT OF NPM PACK ======
+*.tgz
+
+# ====== YARN INTEGRITY FILE ======
+.yarn-integrity
+
+# ====== PARCEL-BUNDLER CACHE ======
+.cache
+.parcel-cache
+
+# ====== NEXT.JS BUILD OUTPUT ======
+.next/
+out/
+
+# ====== NUXT.JS BUILD ======
+.nuxt
+dist
+
+# ====== GATSBY FILES ======
+.cache/
+public
+
+# ====== STORYBOOK BUILD OUTPUTS ======
+.out
+.storybook-out
+
+# ====== TEMPORARY FOLDERS ======
+tmp/
+temp/
+
+# ====== EDITOR DIRECTORIES AND FILES ======
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ====== OS GENERATED FILES ======
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ====== TESTING ======
+coverage/
+.nyc_output/
+jest_coverage/
+
+# ====== MISCELLANEOUS ======
+*.tgz
+*.tar.gz
+.cache/
+
+# ====== SPECIFIC TO THIS PROJECT ======
+
+# API Keys and Secrets (NEVER COMMIT THESE!)
+**/api-keys.json
+**/secrets.json
+**/private-keys.*
+**/wallet-keys.*
+
+# Build artifacts
+/build
+/dist
+
+# Local development
+.env.development
+.env.production
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# Database files (if any)
+*.db
+*.sqlite
+*.sqlite3
+
+# Certificate files
+*.pem
+*.key
+*.crt
+
+# ====== WALLET & CRYPTO RELATED ======
+# Never commit wallet files or private keys
+**/wallet.dat
+**/private-key.*
+**/mnemonic.*
+**/seed-phrase.*
+**/*.wallet
+
+# ====== DEPLOYMENT ======
+.vercel
+.netlify
+.aws
+.firebase
+
+# ====== DOCUMENTATION BUILD ======
+docs/build/
+docs/.docusaurus/
+
+# ====== PERFORMANCE MONITORING ======
+.clinic/
+.0x/
+
+# ====== SENTRY ======
+.sentryclirc
+
+# ====== HUSKY ======
+.husky/_
+
+# ====== ESLINT ======
+.eslintcache
+
+# ====== PRETTIER ======
+.prettierignore
+
+# ====== LOCAL DEVELOPMENT OVERRIDES ======
+docker-compose.override.yml
+local.env
+
+# ====== PROJECT SPECIFIC ======
+# OrdinalsBot specific ignores
+**/ordinalsbot-keys.*
+**/test-data/private/
+**/mock-wallets/
+
+# Screenshots and recordings for development
+screenshots/
+recordings/
+*.gif
+*.mp4
+*.mov
+
+# Local configuration overrides
+local-config.json
+dev-config.json
+
+# ====== KEEP THESE FILES ======
+# Don't ignore these important files:
+# !.gitkeep
+# !.env.example
+# !README.md
+# !package.json
+# !tsconfig.json
+# !next.config.js
+# !tailwind.config.js
