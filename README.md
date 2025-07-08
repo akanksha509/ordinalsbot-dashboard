@@ -4,7 +4,7 @@ A comprehensive Next.js dashboard for Bitcoin Ordinals and BRC-20 tokens with ad
 
 ## Demo
 
-> **[Live Demo](https://ordinalsbot-dashboard-git-main-akanksha509s-projects.vercel.app/)**
+> **[Live Demo](https://ordinalsbot-dashboard.vercel.app/)**
 
 ## Overview
 
