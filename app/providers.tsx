@@ -79,7 +79,7 @@ export function Providers({ children }: ProvidersProps) {
     )
   }
 
-  // ✅ Get the correct network based on environment
+  //  Get the correct network based on environment
   const isTestnet = getNetworkFromEnv() === 'testnet'
   const network = isTestnet ? BaseNetwork.TESTNET : BaseNetwork.MAINNET
 
