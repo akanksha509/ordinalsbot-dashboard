@@ -93,7 +93,7 @@ dist
 
 # ====== GATSBY FILES ======
 .cache/
-public
+
 
 # ====== STORYBOOK BUILD OUTPUTS ======
 .out
