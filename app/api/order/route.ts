@@ -27,9 +27,6 @@ async function ordinalsFetch(path: string, opts: RequestInit = {}) {
   if (!API_KEY) throw new Error('OrdinalsBot API key is not configured')
   const url = path.startsWith('http') ? path : BASE_URL + path
   
-  console.log(` [OrdinalsBot API] ${opts.method || 'GET'} ${url}`)
-  console.log(` [OrdinalsBot API] Using API key: ${API_KEY.substring(0, 8)}...${API_KEY.substring(API_KEY.length - 4)}`)
-  
   const res = await fetch(url, {
     ...opts,
     headers: {
@@ -40,18 +37,14 @@ async function ordinalsFetch(path: string, opts: RequestInit = {}) {
   })
   
   const responseText = await res.text()
-  console.log(` [OrdinalsBot API] Status: ${res.status} ${res.statusText}`)
-  console.log(` [OrdinalsBot API] Response: ${responseText.substring(0, 500)}`)
   
   if (!res.ok) {
-    console.error(` [OrdinalsBot API] Error ${res.status}: ${responseText}`)
     throw new Error(`OrdinalsBot API error ${res.status}: ${responseText}`)
   }
   
   try {
     return JSON.parse(responseText)
   } catch (e) {
-    console.error(` [OrdinalsBot API] Invalid JSON: ${responseText}`)
     throw new Error(`Invalid JSON response: ${responseText}`)
   }
 }
@@ -155,7 +148,6 @@ function convertToOrdinalsFormat(order: CreateOrderRequest): OrdinalsOrderPayloa
   return payload
 }
 
-
 export async function GET(req: NextRequest) {
   const id = new URL(req.url).searchParams.get('id')
   if (!id) {
@@ -165,18 +157,9 @@ export async function GET(req: NextRequest) {
     )
   }
 
-  console.log(` [Assignment] Fetching order using assignment's /order endpoint`)
-  console.log(` [Assignment] Order ID: ${id}`)
-  console.log(` [Assignment] Network: ${getNetworkFromEnv()}`)
-  console.log(` [Assignment] Base URL: ${BASE_URL}`)
-
   try {
-   
     const data = await ordinalsFetch(`/order?id=${encodeURIComponent(id)}`)
     const network = getNetworkFromEnv()
-    
-    console.log(` [Assignment] Successfully fetched order data`)
-    console.log(` [Assignment] Order data:`, JSON.stringify(data, null, 2))
     
     // Handle the response format 
     const orderData = data.data || data
@@ -213,7 +196,6 @@ export async function GET(req: NextRequest) {
     })
     
   } catch (e: any) {
-    console.error(` [Assignment] Order fetch failed:`, e.message)
     return NextResponse.json(
       { success: false, error: e.message },
       { status: 500 }
@@ -262,7 +244,6 @@ export async function POST(req: NextRequest) {
   try {
     const payload = convertToOrdinalsFormat(body)
     
-   
     const data = await ordinalsFetch('/order', {
       method: 'POST',
       body: JSON.stringify(payload),

@@ -425,7 +425,6 @@ export interface NavItem {
 }
 
 // Token Grid Props
-// ✅ REPLACE WITH THIS:
 export interface TokenGridProps {
   tokens: BRC20Token[]
   tickerInfos: Record<string, BRC20TickerInfo>

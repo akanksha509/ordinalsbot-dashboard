@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, RefreshCw, Network, Wallet, WalletIcon } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { OrderRow } from '@/components/orders/OrderRow'
-import { useRecentOrders } from '@/lib/order-manager'
+import { useRecentOrders, useOrderCacheManager } from '@/lib/order-manager' 
 import { useLaserEyes } from '@omnisat/lasereyes-react'
 import { FormattingUtils } from '@/lib/utils/index'
 
@@ -19,7 +19,9 @@ interface RecentOrdersProps {
 
 export function RecentOrders({ maxOrders = 5, showAddInput = true }: RecentOrdersProps) {
   const [newOrderId, setNewOrderId] = useState('')
+  const [forceUpdate, setForceUpdate] = useState(0) 
   const laserEyes = useLaserEyes()
+  const { invalidateOrderCaches } = useOrderCacheManager() 
   
   const {
     orders,
@@ -29,9 +31,69 @@ export function RecentOrders({ maxOrders = 5, showAddInput = true }: RecentOrder
     refetch,
     addOrderId,
     isWalletConnected,
-    walletAddress
+    walletAddress,
+    forceRefresh 
   } = useRecentOrders(maxOrders)
 
+  // Listen for wallet connection changes
+  useEffect(() => {
+    console.log(' Wallet connection changed, refreshing recent orders')
+    setForceUpdate(prev => prev + 1)
+    
+    // Small delay to ensure wallet state is settled
+    setTimeout(() => {
+      if (typeof forceRefresh === 'function') {
+        forceRefresh()
+      } else {
+        refetch()
+      }
+    }, 100)
+  }, [isWalletConnected, walletAddress, forceRefresh, refetch])
+
+  // Listen for storage changes (when orders are added)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key?.includes('trackedOrders')) {
+        console.log('Order storage changed, refreshing recent orders')
+        setForceUpdate(prev => prev + 1)
+        invalidateOrderCaches()
+        
+        setTimeout(() => {
+          if (typeof forceRefresh === 'function') {
+            forceRefresh()
+          } else {
+            refetch()
+          }
+        }, 100)
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [invalidateOrderCaches, forceRefresh, refetch])
+
+  // Listen for new orders from order creation
+  useEffect(() => {
+    const handleNewOrder = (event: CustomEvent) => {
+      console.log(' New order created, refreshing recent orders')
+      setForceUpdate(prev => prev + 1)
+      
+      // Wait a bit for the order to be saved, then refresh
+      setTimeout(() => {
+        invalidateOrderCaches()
+        
+        if (typeof forceRefresh === 'function') {
+          forceRefresh()
+        } else {
+          refetch()
+        }
+      }, 500)
+    }
+
+    // Listen for custom order creation events
+    window.addEventListener('orderCreated', handleNewOrder as EventListener)
+    return () => window.removeEventListener('orderCreated', handleNewOrder as EventListener)
+  }, [invalidateOrderCaches, forceRefresh, refetch])
 
   const getDisplayOrders = () => {
     if (!isWalletConnected) {
@@ -52,12 +114,35 @@ export function RecentOrders({ maxOrders = 5, showAddInput = true }: RecentOrder
       const added = addOrderId(newOrderId.trim())
       if (added) {
         setNewOrderId('')
+        // Force immediate refresh after adding order
+        setTimeout(() => {
+          setForceUpdate(prev => prev + 1)
+          if (typeof forceRefresh === 'function') {
+            forceRefresh()
+          } else {
+            refetch()
+          }
+        }, 100)
       }
     }
   }
 
   const handleOrderClick = (orderId: string) => {
     window.open(`/orders/${orderId}`, '_blank')
+  }
+
+  // Enhanced refresh function
+  const handleRefresh = () => {
+    console.log('Manual refresh triggered')
+    setForceUpdate(prev => prev + 1)
+    invalidateOrderCaches()
+    
+    // Use forceRefresh if available, fallback to refetch
+    if (typeof forceRefresh === 'function') {
+      forceRefresh()
+    } else {
+      refetch()
+    }
   }
 
   return (
@@ -87,7 +172,7 @@ export function RecentOrders({ maxOrders = 5, showAddInput = true }: RecentOrder
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => refetch()}
+            onClick={handleRefresh}
             className="h-8 w-8 p-0 hover:bg-orange-500/10 hover:border-orange-300"
           >
             <RefreshCw className="h-4 w-4" />
@@ -180,7 +265,7 @@ export function RecentOrders({ maxOrders = 5, showAddInput = true }: RecentOrder
             {displayOrders.length > 0 ? (
               displayOrders.map((order, index) => (
                 <div 
-                  key={`order-${order.id}-${index}`} 
+                  key={`order-${order.id}-${index}-${forceUpdate}`} 
                   className="group relative bg-gradient-to-r from-background to-background/50 border border-border/50 rounded-lg hover:border-orange-300/50 hover:shadow-md transition-all duration-200"
                 >
                   <OrderRow

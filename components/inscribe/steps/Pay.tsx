@@ -157,7 +157,7 @@ export function Pay({
         }
       }
     } catch (error) {
-      console.error('Failed to load wallet balance:', error)
+      // Error handled silently
     }
     setWalletBalance(0)
     return 0
@@ -176,7 +176,7 @@ export function Pay({
         }
       }
     } catch (error) {
-      console.error('Failed to fetch dynamic fees:', error)
+      // Error handled silently
     }
     return networkConfig.defaultFeeRate
   }
@@ -190,10 +190,6 @@ export function Pay({
     const sizeFee = Math.max(networkFee, minimumFee)
     const serviceFee = Math.max(2000, sizeFee * 0.1)
     const totalFee = sizeFee + serviceFee
-    
-    console.log(` [Fee Calculation] Network: ${network}`)
-    console.log(` [Fee Calculation] Fee rate: ${feeRate} sat/vB`)
-    console.log(` [Fee Calculation] Total fee: ${totalFee} sats`)
     
     return totalFee
   }
@@ -224,8 +220,6 @@ export function Pay({
         feeRate: dynamicFeeRate,
         fee: totalFee
       }
-
-      console.log(`🔍 [Order Creation] Creating order:`, JSON.stringify(orderPayload, null, 2))
 
       // BRC-20 handling
       if (data.type?.startsWith('brc20') && data.brc20Details) {
@@ -279,8 +273,6 @@ export function Pay({
       if (data.title) orderPayload.title = data.title
       if (data.description) orderPayload.description = data.description
 
-      console.log(` [Order Creation] Final payload:`, JSON.stringify(orderPayload, null, 2))
-
       const response = await fetch('/api/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -288,7 +280,6 @@ export function Pay({
       })
 
       const text = await response.text()
-      console.log(` [Order Creation] Response status: ${response.status}`)
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${text}`)
@@ -303,33 +294,19 @@ export function Pay({
       let paymentAddress = result.data.paymentAddress
       let paymentAmount = result.data.amount
 
-      console.log(` [Order Creation] Order created successfully`)
-      console.log(` [Order Creation] Order ID: ${orderId}`)
-      console.log(` [Order Creation] Payment address: ${paymentAddress}`)
-      console.log(` [Order Creation] Payment amount: ${paymentAmount} sats`)
-
       // If payment details are missing, try to fetch them
       if (!paymentAddress || !paymentAmount) {
-        console.log(`🔍 [Order Creation] Fetching order details for payment info`)
-        
         const orderResponse = await fetch(`/api/order?id=${orderId}`)
         const orderResult = await orderResponse.json()
         
         if (orderResult.success && orderResult.data) {
           paymentAddress = orderResult.data.paymentAddress || paymentAddress
           paymentAmount = orderResult.data.paymentAmount || paymentAmount
-          
-          console.log(` [Order Creation] Updated payment details from order fetch`)
         }
       }
 
       if (!paymentAddress || !paymentAmount) {
         throw new Error('No payment details returned from order creation')
-      }
-
-      // Check if we have sufficient balance
-      if (currentBalance < paymentAmount) {
-        console.warn(` [Order Creation] Insufficient balance: ${currentBalance} < ${paymentAmount}`)
       }
 
       // Add to order tracking
@@ -346,12 +323,11 @@ export function Pay({
       setPaymentStep('awaiting_payment')
       
       toast({
-        title: ' Order created!',
+        title: 'Order created!',
         description: `Order ${orderId.slice(0, 8)}... ready for payment`
       })
 
     } catch (err: any) {
-      console.error(' [Order Creation] Failed:', err)
       setError(`Failed to create order: ${getErrorMessage(err)}`)
       onUpdate({ paymentStatus: 'failed' })
       setPaymentStep('awaiting_payment')
@@ -360,7 +336,7 @@ export function Pay({
     }
   }
 
-  //  Enhanced PSBT payment using wallet's built-in PSBT capabilities
+  // Enhanced PSBT payment using wallet's built-in PSBT capabilities
   const payWithPSBT = async (): Promise<void> => {
     if (!data.paymentAddress || !data.paymentAmount) {
       setError('Payment details missing')
@@ -378,32 +354,22 @@ export function Pay({
     setPaymentStep('creating_psbt')
 
     try {
-      console.log(' [PSBT Flow] Creating PSBT payment using wallet capabilities')
-
       const current = await loadWalletBalance()
       if (current < data.paymentAmount) {
         const balanceError = `Insufficient balance: ${current.toLocaleString()} sats available, ${data.paymentAmount.toLocaleString()} sats required`
         throw new Error(balanceError)
       }
 
-      //  Use wallet's native PSBT creation
-      
       setPaymentStep('signing_psbt')
-      
-      console.log(` [PSBT Flow] Creating payment PSBT`)
-      console.log(` [PSBT Flow] To: ${data.paymentAddress}`)
-      console.log(` [PSBT Flow] Amount: ${data.paymentAmount} sats`)
 
       // Use wallet's PSBT payment method if available
       let txid: string
 
       if (typeof laserEyes.sendBTC === 'function') {
         // Method 1: Use sendBTC which internally uses PSBT for compatible wallets
-        console.log(' [PSBT Flow] Using wallet sendBTC with PSBT optimization')
         txid = await laserEyes.sendBTC(data.paymentAddress, data.paymentAmount)
       } else if (typeof (laserEyes as any).send === 'function') {
         // Method 2: Use generic send function
-        console.log(' [PSBT Flow] Using wallet send function')
         txid = await (laserEyes as any).send(data.paymentAddress, data.paymentAmount)
       } else {
         throw new Error('Wallet does not support payment functions')
@@ -412,9 +378,6 @@ export function Pay({
       if (!txid || typeof txid !== 'string' || txid.length < 10) {
         throw new Error(`Invalid transaction ID received: ${txid}`)
       }
-
-      console.log(' [PSBT Flow] Payment sent successfully using wallet PSBT')
-      console.log(' [PSBT Flow] Transaction ID:', txid)
 
       onUpdate({ txid, paymentStatus: 'sent' })
       setPaymentStep('payment_sent')
@@ -427,7 +390,6 @@ export function Pay({
       startPaymentMonitoring()
 
     } catch (err: any) {
-      console.error(' [PSBT Flow] Payment failed:', err)
       setError(getPSBTErrorMessage(err))
       onUpdate({ paymentStatus: 'failed' })
       setPaymentStep('awaiting_payment')
@@ -458,11 +420,6 @@ export function Pay({
         throw new Error(balanceError)
       }
 
-      console.log(` [Manual Payment] Sending payment`)
-      console.log(` [Manual Payment] To: ${data.paymentAddress}`)
-      console.log(` [Manual Payment] Amount: ${data.paymentAmount} sats`)
-      console.log(` [Manual Payment] Balance: ${current} sats`)
-
       const sendFn = laserEyes.sendBTC || (laserEyes as any).send
       if (typeof sendFn !== 'function') {
         throw new Error('Wallet does not support sending BTC')
@@ -473,9 +430,6 @@ export function Pay({
       if (!txid || typeof txid !== 'string' || txid.length < 10) {
         throw new Error(`Invalid transaction ID received: ${txid}`)
       }
-
-      console.log(` [Manual Payment] Payment sent successfully`)
-      console.log(` [Manual Payment] Transaction ID: ${txid}`)
 
       onUpdate({ txid, paymentStatus: 'sent' })
       setPaymentStep('payment_sent')
@@ -488,7 +442,6 @@ export function Pay({
       startPaymentMonitoring()
       
     } catch (err: any) {
-      console.error(' [Manual Payment] Failed:', err)
       setError(getWalletErrorMessage(err))
       onUpdate({ paymentStatus: 'failed' })
       setPaymentStep('awaiting_payment')
@@ -512,7 +465,6 @@ export function Pay({
       const json = await resp.json()
       return json.success && json.data && (json.data.balance > 0 || json.data.transactions > 0)
     } catch (error) {
-      console.error('Failed to check payment status:', error)
       return false
     }
   }

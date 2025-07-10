@@ -741,7 +741,15 @@ export function getEnvVar(key: string, fallback: string = ''): string {
 
 // Network helpers
 export function getNetworkFromEnv(): 'mainnet' | 'testnet' {
+  // Explicitly check for 'true' string, default to MAINNET for safety
   const useTestnet = process.env.NEXT_PUBLIC_USE_TESTNET === 'true'
+  
+  // Log for debugging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Network] NEXT_PUBLIC_USE_TESTNET:', process.env.NEXT_PUBLIC_USE_TESTNET)
+    console.log('[Network] Resolved network:', useTestnet ? 'testnet' : 'mainnet')
+  }
+  
   return useTestnet ? 'testnet' : 'mainnet'
 }
 
@@ -800,7 +808,3 @@ export const {
   getStatusVariant
 } = FormattingUtils
 
-//  LEGACY ALIASES 
-export const formatSats = FormattingUtils.formatSatoshis
-export const formatBtc = FormattingUtils.formatBTC
-export const truncateAddr = FormattingUtils.truncateAddress

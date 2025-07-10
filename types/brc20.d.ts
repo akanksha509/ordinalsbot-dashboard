@@ -118,15 +118,6 @@ export interface TokenCardProps {
   className?: string         
 }
 
-export interface TokenGridProps {
-  tokens: BRC20Token[]
-  tickerInfos: Record<string, BRC20TickerInfo>
-  loading?: boolean
-  error?: string | null
-  onRefresh?: () => void     
-  onTokenClick?: (ticker: string) => void  
-}
-
 // Formatting helpers for display
 export interface TokenDisplayData {
   ticker: string
@@ -156,102 +147,9 @@ export interface BRC20OrderDetails {
   networkFee?: number
 }
 
-// BRC-20 Transaction data
-export interface BRC20Transaction {
-  id: string
-  type: 'deploy' | 'mint' | 'transfer'
-  ticker: string
-  amount?: string
-  from?: string
-  to?: string
-  txid: string
-  inscriptionId: string
-  blockHeight: number
-  timestamp: number
-  confirmations: number
-  status: 'pending' | 'confirmed' | 'failed'
-  networkFee: number
-}
-
-// BRC-20 Wallet integration types
-export interface BRC20WalletBalance {
-  address: string
-  network: 'mainnet' | 'testnet'
-  tokens: BRC20Token[]
-  totalTokens: number
-  totalValue?: number
-  lastUpdated: number
-}
-
-// BRC-20 Send transaction params 
-export interface BRC20SendParams {
-  ticker: string
-  amount: string
-  toAddress: string
-  feeRate?: number
-  priority?: 'low' | 'normal' | 'high'
-}
-
-// BRC-20 Send result
-export interface BRC20SendResult {
-  success: boolean
-  txid?: string
-  inscriptionId?: string
-  error?: string
-  estimatedConfirmTime?: number
-}
-
-// BRC-20 Market data
-export interface BRC20MarketData {
-  ticker: string
-  price?: number
-  volume24h?: number
-  marketCap?: number
-  holders: number
-  totalSupply: string
-  circulatingSupply: string
-  lastUpdated: number
-}
-
-// BRC-20 Search/Filter types
-export interface BRC20SearchParams {
-  query?: string
-  sortBy?: 'ticker' | 'balance' | 'holders' | 'marketCap'
-  sortDirection?: 'asc' | 'desc'
-  filterBy?: 'all' | 'transferable' | 'divisible' | 'active'
-  limit?: number
-  offset?: number
-}
-
-export interface BRC20SearchResult {
-  tokens: BRC20Token[]
-  tickerInfos: Record<string, BRC20TickerInfo>
-  totalCount: number
-  hasMore: boolean
-}
-
-// BRC-20 Error types
-export interface BRC20Error {
-  code: string
-  message: string
-  ticker?: string
-  operation?: string
-  details?: any
-}
-
-// BRC-20 Validation result
-export interface BRC20ValidationResult {
-  isValid: boolean
-  errors: BRC20Error[]
-  warnings?: string[]
-}
-
-// All types for easy importing
+// Essential type aliases
 export type BRC20Operation = 'deploy' | 'mint' | 'transfer'
 export type BRC20Status = 'pending' | 'confirmed' | 'failed'
-export type BRC20Priority = 'low' | 'normal' | 'high'
-export type BRC20SortField = 'ticker' | 'balance' | 'holders' | 'marketCap'
-export type BRC20FilterType = 'all' | 'transferable' | 'divisible' | 'active'
 
 // Type guards for BRC-20 operations
 export function isBRC20Deploy(operation: any): operation is BRC20Deploy {
@@ -264,26 +162,4 @@ export function isBRC20Mint(operation: any): operation is BRC20Mint {
 
 export function isBRC20Transfer(operation: any): operation is BRC20Transfer {
   return operation && operation.amount && operation.from && operation.to
-}
-
-// Helper functions for BRC-20 data
-export function formatBRC20Amount(amount: string, decimals: number = 18): string {
-  const num = Number(amount)
-  if (decimals === 0) return num.toLocaleString()
-  return (num / Math.pow(10, decimals)).toLocaleString()
-}
-
-export function parseBRC20Amount(amount: string, decimals: number = 18): string {
-  const num = parseFloat(amount)
-  if (decimals === 0) return num.toString()
-  return (num * Math.pow(10, decimals)).toString()
-}
-
-export function validateBRC20Ticker(ticker: string): boolean {
-  return typeof ticker === 'string' && ticker.length >= 1 && ticker.length <= 4
-}
-
-export function validateBRC20Amount(amount: string): boolean {
-  const num = Number(amount)
-  return !isNaN(num) && num > 0
 }

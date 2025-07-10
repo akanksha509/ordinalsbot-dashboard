@@ -24,22 +24,56 @@ import {
 
 export function ConnectButton() {
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [forceRender, setForceRender] = useState(0)
+  const [forceUpdate, setForceUpdate] = useState(0)
   const { toast } = useToast()
   
-  // Use LaserEyes hook directly - it handles SSR internally
   const laserEyes = useLaserEyes()
 
-  // Force re-render when LaserEyes state changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setForceRender(prev => prev + 1)
-    }, 100)
-    
-    return () => clearTimeout(timer)
+    const handleWalletChange = () => {
+      console.log(' Wallet state changed, forcing re-render')
+      setForceUpdate(prev => prev + 1)
+    }
+
+    // Listen for any wallet connection state changes
+    if (laserEyes.connected !== undefined) {
+      handleWalletChange()
+    }
+  }, [laserEyes.connected, laserEyes.address, laserEyes.balance, laserEyes.network])
+
+  // Clear component state on disconnect with better logging
+  useEffect(() => {
+    if (!laserEyes.connected) {
+      console.log('🔌 Wallet disconnected, clearing component state')
+      setIsModalOpen(false)
+      setForceUpdate(prev => prev + 1)
+      
+      // Dispatch global wallet disconnection event
+      const event = new CustomEvent('walletDisconnected', {
+        detail: { timestamp: Date.now() }
+      })
+      window.dispatchEvent(event)
+    }
+  }, [laserEyes.connected])
+
+  //  Listen for successful wallet connections
+  useEffect(() => {
+    if (laserEyes.connected && laserEyes.address) {
+      console.log(' Wallet connected successfully:', laserEyes.address)
+      setForceUpdate(prev => prev + 1)
+      
+      // Dispatch global wallet connection event
+      const event = new CustomEvent('walletConnected', {
+        detail: { 
+          address: laserEyes.address, 
+          network: laserEyes.network,
+          timestamp: Date.now() 
+        }
+      })
+      window.dispatchEvent(event)
+    }
   }, [laserEyes.connected, laserEyes.address, laserEyes.network])
 
-  // Check PSBT compatibility
   const psbtCompatibility = checkPSBTCompatibility(laserEyes)
   const walletCapabilities = detectWalletCapabilities(laserEyes)
 
@@ -50,13 +84,24 @@ export function ConnectButton() {
 
   const handleDisconnect = async () => {
     try {
+      console.log('🔌 Initiating wallet disconnect...')
       await laserEyes.disconnect()
-      // Force re-render after disconnect
-      setTimeout(() => setForceRender(prev => prev + 1), 100)
+      
+      // Multiple state updates for reliability
+      setForceUpdate(prev => prev + 1)
+      setIsModalOpen(false)
+      
       toast({
         title: "Wallet disconnected",
         description: "Your wallet has been disconnected",
       })
+      
+      // Additional state cleanup with longer delay
+      setTimeout(() => {
+        setForceUpdate(prev => prev + 1)
+        console.log('🔄 Post-disconnect state cleanup completed')
+      }, 200)
+      
     } catch (error) {
       logError(error, 'WalletDisconnect')
       toast({
@@ -70,13 +115,19 @@ export function ConnectButton() {
   const handleConnectClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    console.log('🔗 Opening wallet connection modal')
     setIsModalOpen(true)
   }
 
   const handleModalClose = () => {
+    console.log('🔒 Closing wallet connection modal')
     setIsModalOpen(false)
-    // Force re-render after modal closes to catch any connection changes
-    setTimeout(() => setForceRender(prev => prev + 1), 200)
+    
+    // Force update with longer delay to catch connection changes
+    setTimeout(() => {
+      setForceUpdate(prev => prev + 1)
+      console.log('🔄 Post-modal state update completed')
+    }, 150)
   }
 
   // Show loading state while connecting
@@ -91,8 +142,14 @@ export function ConnectButton() {
     )
   }
 
+  // More robust connection check with additional validation
+  const isActuallyConnected = laserEyes.connected && 
+                              laserEyes.address && 
+                              !laserEyes.isConnecting &&
+                              laserEyes.address.length > 10 
+
   // Show connected state with dropdown
-  if (laserEyes.connected && laserEyes.address) {
+  if (isActuallyConnected) {
     return (
       <>
         <DropdownMenu>
@@ -122,7 +179,7 @@ export function ConnectButton() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Badge variant="success" className="text-xs">
-                    {laserEyes.network}
+                    {laserEyes.network || 'mainnet'}
                   </Badge>
                   {laserEyes.balance !== undefined && (
                     <span className="text-xs text-muted-foreground">
@@ -183,7 +240,7 @@ export function ConnectButton() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Modal for wallet selection */}
+        {/* Modal for wallet selection (only show when explicitly opened) */}
         <Modal
           isOpen={isModalOpen}
           onClose={handleModalClose}

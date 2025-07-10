@@ -1,5 +1,5 @@
 import { Order, OrderStatus } from '@/types'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, useCallback, useMemo } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { useLaserEyes } from '@omnisat/lasereyes-react'
@@ -14,7 +14,57 @@ import {
 // BACKWARD COMPATIBILITY: Re-export for existing imports
 export { getNetworkFromEnv as getCurrentNetwork }
 
-//  Order validation function
+// Global query client access for cache invalidation
+export function useOrderCacheManager() {
+  const queryClient = useQueryClient()
+  const network = getNetworkFromEnv()
+  
+  const invalidateOrderCaches = useCallback(() => {
+    console.log(' Invalidating order caches...')
+    
+    // Invalidate all order-related queries
+    queryClient.invalidateQueries({ 
+      queryKey: ['orders', network] 
+    })
+    queryClient.invalidateQueries({ 
+      queryKey: ['tracked-orders'] 
+    })
+    queryClient.invalidateQueries({ 
+      queryKey: ['recent-orders'] 
+    })
+    
+    // Force refetch immediately
+    queryClient.refetchQueries({ 
+      queryKey: ['orders', network] 
+    })
+  }, [queryClient, network])
+  
+  const addOrderToCache = useCallback((newOrder: Order) => {
+    console.log(' Adding order to cache:', newOrder.id)
+    
+    // Update existing order queries with new order
+    queryClient.setQueryData(['orders', network], (oldData: Order[] | undefined) => {
+      if (!oldData) return [newOrder]
+      
+      // Check if order already exists
+      const exists = oldData.some(order => order.id === newOrder.id)
+      if (exists) return oldData
+      
+      // Add new order to beginning of list
+      return [newOrder, ...oldData]
+    })
+    
+    // Invalidate to trigger fresh fetch
+    invalidateOrderCaches()
+  }, [queryClient, network, invalidateOrderCaches])
+  
+  return {
+    invalidateOrderCaches,
+    addOrderToCache
+  }
+}
+
+// Order validation function
 function validateOrderId(orderId: string): { isValid: boolean; error?: string } {
   if (!orderId || typeof orderId !== 'string') {
     return { isValid: false, error: 'Order ID is required' }
@@ -28,7 +78,7 @@ function validateOrderId(orderId: string): { isValid: boolean; error?: string } 
   return { isValid: true }
 }
 
-//  All order IDs in one place with proper typing
+// All order IDs in one place with proper typing
 export const DEFAULT_ORDER_IDS: Record<'mainnet' | 'testnet', readonly string[]> = {
   mainnet: [
     '39c9bdcf-6459-4509-b7a6-7138ac826378', // Assessment order 1
@@ -49,7 +99,7 @@ export function getDefaultOrderIds(): string[] {
   return [...DEFAULT_ORDER_IDS[network]] // Create mutable copy
 }
 
-// Storage management
+// Storage management with event dispatching
 export class OrderStorage {
   private static getStorageKey(): string {
     const network = getNetworkFromEnv()
@@ -84,6 +134,14 @@ export class OrderStorage {
     
     try {
       localStorage.setItem(this.getStorageKey(), JSON.stringify(orderIds))
+      
+      //  Dispatch storage event for cross-component sync
+      const event = new StorageEvent('storage', {
+        key: this.getStorageKey(),
+        newValue: JSON.stringify(orderIds),
+        storageArea: localStorage
+      })
+      window.dispatchEvent(event)
     } catch (error) {
       console.error('Error saving tracked orders:', error)
     }
@@ -121,9 +179,19 @@ export class OrderStorage {
     this.saveTrackedOrderIds(defaults)
   }
 
-  // Add new inscription order 
+  // Add new inscription order with event dispatching
   static addNewInscriptionOrder(orderId: string): void {
-    this.addOrderId(orderId)
+    const added = this.addOrderId(orderId)
+    
+    if (added) {
+      // Dispatch order creation event
+      const event = new CustomEvent('orderCreated', {
+        detail: { orderId, network: getNetworkFromEnv(), timestamp: Date.now() }
+      })
+      window.dispatchEvent(event)
+      
+      console.log(' New inscription order added:', orderId)
+    }
   }
 }
 
@@ -251,7 +319,7 @@ export class OrderUtils {
     })
   }
 
-  //  Filter orders by category using normalized status
+  // Filter orders by category using normalized status
   static filterOrdersByCategory(orders: Order[], category: 'all' | 'pending' | 'confirmed' | 'failed'): Order[] {
     if (category === 'all') return orders
     
@@ -364,14 +432,14 @@ export class OrderFetcher {
 }
 
 export const ORDER_QUERY_CONFIG = {
-  staleTime: 30000, // 30 seconds
+  staleTime: 10000, 
   
   // Refetch interval based on active orders
   getRefetchInterval: (orders: Order[] | undefined): number | false => {
     if (!orders) return false
     
     const hasActiveOrders = orders.some(order => OrderUtils.isActiveOrder(order))
-    return hasActiveOrders ? 60000 : false // 1 minute for active orders
+    return hasActiveOrders ? 30000 : false 
   },
 
   // Query key factory
@@ -394,7 +462,7 @@ export const ORDER_QUERY_CONFIG = {
   }
 }
 
-//  Custom status counts function that uses normalized status
+// Custom status counts function that uses normalized status
 function calculateNormalizedStatusCounts(orders: Order[]) {
   // First normalize all statuses, then calculate counts
   const normalizedOrders = orders.map(order => ({
@@ -405,7 +473,7 @@ function calculateNormalizedStatusCounts(orders: Order[]) {
   return calculateStatusCounts(normalizedOrders)
 }
 
-// Main order management hook
+// Main order management hook with cache management
 export function useOrderManager(options: {
   maxOrders?: number
   showFilters?: boolean
@@ -415,6 +483,7 @@ export function useOrderManager(options: {
   const { maxOrders, showFilters = false, autoRefresh = true, requireWallet = false } = options
   const { toast } = useToast()
   const laserEyes = useLaserEyes()
+  const { invalidateOrderCaches } = useOrderCacheManager() 
      
   const isWalletConnected = laserEyes.connected || false
   const walletAddress = laserEyes.address
@@ -428,7 +497,7 @@ export function useOrderManager(options: {
 
   const shouldFetchOrders = !requireWallet || isWalletConnected
 
-  // Main query with proper typing
+  // Main query with cache management
   const {
     data: orders = [],
     isLoading,
@@ -437,6 +506,8 @@ export function useOrderManager(options: {
   } = useQuery({
     queryKey: ORDER_QUERY_CONFIG.getQueryKey('tracked'),
     queryFn: async (): Promise<Order[]> => {
+      console.log('🔍 Fetching orders...')
+      
       if (requireWallet && !isWalletConnected) {
         return []
       }
@@ -448,14 +519,15 @@ export function useOrderManager(options: {
       return OrderFetcher.fetchTrackedOrders()
     },
     enabled: shouldFetchOrders,
-    staleTime: ORDER_QUERY_CONFIG.staleTime,
-    // Proper query parameter typing
+    staleTime: ORDER_QUERY_CONFIG.staleTime, 
+    gcTime: 30000, 
     refetchInterval: autoRefresh ? (query) => {
       const orders = query?.state?.data as Order[] | undefined
       const hasActiveOrders = orders?.some((order: Order) => OrderUtils.isActiveOrder(order))
-      return hasActiveOrders ? 60000 : false
+      return hasActiveOrders ? 30000 : false 
     } : false,
     refetchOnWindowFocus: true,
+    refetchOnMount: 'always', 
   })
 
   const error = queryError instanceof Error ? queryError.message : null
@@ -480,7 +552,7 @@ export function useOrderManager(options: {
     return maxOrders ? filtered.slice(0, maxOrders) : filtered
   }, [orders, showFilters, searchQuery, statusFilter, sortBy, sortDirection, maxOrders])
 
-  // Actions
+  // Actions with cache invalidation
   const addOrderId = useCallback((orderId: string): boolean => {
     const added = OrderStorage.addOrderId(orderId)
          
@@ -489,6 +561,9 @@ export function useOrderManager(options: {
         title: "Order added",
         description: `Order added to ${currentNetwork} tracking list`,
       })
+      
+      // Invalidate cache immediately
+      invalidateOrderCaches()
       refetch()
     } else {
       toast({
@@ -499,7 +574,7 @@ export function useOrderManager(options: {
     }
          
     return added
-  }, [toast, refetch, currentNetwork])
+  }, [toast, refetch, currentNetwork, invalidateOrderCaches])
 
   const removeOrderId = useCallback((orderId: string) => {
     OrderStorage.removeOrderId(orderId)
@@ -507,8 +582,11 @@ export function useOrderManager(options: {
       title: "Order removed",
       description: `Order removed from ${currentNetwork} tracking list`,
     })
+    
+    // Invalidate cache immediately
+    invalidateOrderCaches()
     refetch()
-  }, [toast, refetch, currentNetwork])
+  }, [toast, refetch, currentNetwork, invalidateOrderCaches])
 
   const resetToDefaults = useCallback(() => {
     OrderStorage.resetToDefaults()
@@ -516,13 +594,23 @@ export function useOrderManager(options: {
       title: "Reset to default orders",
       description: `Now showing default ${currentNetwork} orders`,
     })
+    
+    // Invalidate cache immediately
+    invalidateOrderCaches()
     refetch()
-  }, [toast, refetch, currentNetwork])
+  }, [toast, refetch, currentNetwork, invalidateOrderCaches])
 
   // Category filtering function
   const filterByCategory = useCallback((category: 'all' | 'pending' | 'confirmed' | 'failed') => {
     return OrderUtils.filterOrdersByCategory(orders, category)
   }, [orders])
+
+  // Force refresh function
+  const forceRefresh = useCallback(() => {
+    console.log(' Force refreshing orders...')
+    invalidateOrderCaches()
+    return refetch()
+  }, [invalidateOrderCaches, refetch])
 
   // Return all properties
   return {
@@ -539,6 +627,7 @@ export function useOrderManager(options: {
          
     // Actions
     refetch,
+    forceRefresh,
     addOrderId,
     removeOrderId,
     resetToDefaults,
@@ -564,7 +653,7 @@ export function useOrderManager(options: {
   }
 }
 
-// Specialized hooks
+// Specialized hooks with cache management
 export function useRecentOrders(maxOrders: number = 5) {
   return useOrderManager({ 
     maxOrders,
@@ -582,7 +671,7 @@ export function useOrdersPage() {
   })
 }
 
-// useOrder hook with proper typing
+// useOrder hook with better caching
 export function useOrder(orderId: string) {
   return useQuery({
     queryKey: ORDER_QUERY_CONFIG.getQueryKey('single', orderId),
@@ -591,7 +680,7 @@ export function useOrder(orderId: string) {
     },
     enabled: !!orderId,
     staleTime: ORDER_QUERY_CONFIG.staleTime,
-    // Proper query parameter typing
+    gcTime: 30000,
     refetchInterval: (query) => {
       const order = query?.state?.data as Order | null
       return order && OrderUtils.isActiveOrder(order) 
@@ -599,6 +688,7 @@ export function useOrder(orderId: string) {
         : false
     },
     refetchOnWindowFocus: true,
+    refetchOnMount: 'always', 
     retry: (failureCount, error) => {
       if (error instanceof Error && error.message.includes('not found')) {
         return false
