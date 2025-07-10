@@ -77,16 +77,16 @@ export function useAutoReconnect(options: AutoReconnectOptions = {}) {
     let unsubscribeAddressChange: (() => void) | undefined
     if (client?.on) {
       unsubscribeAddressChange = client.on('addressChange', async () => {
-        console.log('🔄 Detected wallet address change; reconnecting…')
+        console.log(' Detected wallet address change; reconnecting…')
         try {
           await laserEyes.connect(client.provider)
           retryCount.current = 0
           console.log(
-            '✅ Reconnected to new address:',
+            ' Reconnected to new address:',
             (laserEyes as any).address
           )
         } catch (err) {
-          console.error('❌ Failed to reconnect on addressChange', err)
+          console.error(' Failed to reconnect on addressChange', err)
         }
       })
     }
