@@ -19,11 +19,8 @@ import {
 import { WizardData } from '../Wizard'
 import { Order } from '@/types'
 import { useOrder } from '@/lib/order-manager'
-// ✅ FIXED: Import centralized clipboard utility instead of manual implementation
 import { copyToClipboard } from '@/lib/utils/index'
-// ✅ ADD IMPORT: FormattingUtils for consistent string formatting
 import { FormattingUtils } from '@/lib/utils/index'
-// ✅ INTEGRATE: Use lib/order-status for ALL status logic
 import { 
   getStatusConfig, 
   getStatusProgress, 
@@ -39,7 +36,6 @@ interface ProgressStepProps {
   onReset: () => void
 }
 
-// ✅ ICON MAPPING: For lib/order-status icon strings
 const ICON_COMPONENTS = {
   CheckCircle,
   Clock,
@@ -50,9 +46,7 @@ const ICON_COMPONENTS = {
 } as const
 
 export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
-  // ✅ REMOVED: Manual useToast since copyToClipboard handles it
-  
-  // ✅ ONLY FETCH - Never add orders (that's done in Pay.tsx)
+
   const { 
     data: order, 
     isLoading, 
@@ -60,9 +54,6 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
     refetch 
   } = useOrder(data.orderId || '')
 
-  // ✅ REMOVED: Manual copyText function - replaced with centralized utility
-
-  // ✅ FIXED: Use lib/order-status for status info with proper fallbacks
   const getStatusInfo = () => {
     if (!order) {
       return { 
@@ -72,15 +63,14 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
         icon: Clock,
         isTerminal: false,
         timeEstimate: 'Unknown',
-        category: 'pending' as const,  // ✅ FIXED: Always defined
+        category: 'pending' as const,  
         description: 'Loading order information...'
       }
     }
-    
-    // ✅ USE LIBRARY FUNCTIONS
+  
     const config = getStatusConfig(order.status)
     const progress = getStatusProgress(order.status)
-    const category = categorizeOrderStatus(order.status) || 'pending'  // ✅ FIXED: Add fallback
+    const category = categorizeOrderStatus(order.status) || 'pending'  
     const isTerminal = isTerminalStatus(order.status)
     const timeEstimate = getStatusTimeEstimate(order.status)
     
@@ -92,7 +82,7 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
       color: config.color,
       progress: progress,
       icon: IconComponent,
-      category: category,  // ✅ NOW ALWAYS DEFINED
+      category: category,  
       isTerminal: isTerminal,
       timeEstimate: timeEstimate,
       description: config.description
@@ -136,7 +126,7 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
         <p className="text-gray-400 mb-2">
           {statusInfo.description}
         </p>
-        {/* ✅ ENHANCED: Show time estimate */}
+        {/* Show time estimate */}
         {!statusInfo.isTerminal && (
           <p className="text-sm text-gray-500">
             Estimated time: {statusInfo.timeEstimate}
@@ -144,7 +134,7 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
         )}
       </div>
 
-      {/* ✅ FIXED: Order tracking confirmation with safe category checks */}
+      {/* Order tracking confirmation with safe category checks */}
       {data.orderId && (
         <Alert className={`border-2 ${
           statusInfo.category === 'confirmed' ? 'bg-green-900/20 border-green-600/30' :
@@ -156,12 +146,12 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
             statusInfo.category === 'failed' ? 'text-red-300' :
             'text-blue-300'
           }>
-            ✅ Order {FormattingUtils.formatOrderId(data.orderId)} is being tracked in your orders list
+             Order {FormattingUtils.formatOrderId(data.orderId)} is being tracked in your orders list
           </AlertDescription>
         </Alert>
       )}
 
-      {/* ✅ ENHANCED: Progress Bar using lib/order-status */}
+      {/* Progress Bar using lib/order-status */}
       <Card className="bg-gray-800/50 border-gray-600">
         <CardContent className="p-6">
           <div className="w-full bg-gray-700 rounded-full h-3 mb-4">
@@ -178,7 +168,7 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
             <span className="text-gray-300">Progress</span>
             <span className="text-gray-300">{statusInfo.progress}%</span>
           </div>
-          {/* ✅ ENHANCED: Category indicator */}
+          {/* Category indicator */}
           <div className="mt-2 text-center">
             <Badge 
               variant={
@@ -198,7 +188,7 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
         </CardContent>
       </Card>
 
-      {/* ✅ ENHANCED: Order Details with better styling */}
+      {/* Order Details with better styling */}
       {order && (
         <Card className="bg-gray-800/50 border-gray-600">
           <CardHeader>
@@ -338,7 +328,7 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
         </Card>
       )}
 
-      {/* ✅ ENHANCED: Success Actions using lib/order-status */}
+      {/* Success Actions using lib/order-status */}
       {order && statusInfo.category === 'confirmed' && (
         <Card className="bg-green-900/20 border-green-600/30">
           <CardContent className="p-6 text-center">
@@ -359,7 +349,7 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
         </Card>
       )}
 
-      {/* ✅ ENHANCED: Failed State using lib/order-status */}
+      {/*  Failed State using lib/order-status */}
       {order && statusInfo.category === 'failed' && (
         <Card className="bg-red-900/20 border-red-600/30">
           <CardContent className="p-6 text-center">
@@ -385,7 +375,7 @@ export function ProgressStep({ data, onComplete, onReset }: ProgressStepProps) {
         </Card>
       )}
 
-      {/* ✅ ENHANCED: Auto-refresh indicator using lib/order-status */}
+      {/*  Auto-refresh indicator using lib/order-status */}
       {order && isActiveStatus(order.status) && (
         <div className="flex items-center justify-center space-x-2 text-sm text-gray-400">
           <Loader2 className="h-4 w-4 animate-spin" />
